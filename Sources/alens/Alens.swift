@@ -10,7 +10,7 @@ struct Alens: AsyncParsableCommand {
             StatusCommand.self,
             DiagnoseCommand.self,
             LintCommand.self,
-            CheckCommand.self,
+            CheckCommand.self
         ]
     )
 }
