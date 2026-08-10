@@ -5,7 +5,10 @@ import LSPClient
 
 /// Owns the file-watch registry and the FSEvents→LSP watch pipeline: which LSP
 /// servers asked to be told about which globs, and turning raw filesystem events
-/// into `didChangeWatchedFiles` notifications for the interested servers.
+/// into `didChangeWatchedFiles` notifications for the interested servers. Also takes
+/// the full `ServerEvent` stream from each LSP client — not just watch (un)registration,
+/// but `showMessage` logging and `progress` too — since watch registration is a case
+/// of that same event switch, not a separate feed.
 actor WatchCoordinator {
     private let registry = WatchRegistry()
     private let logger: Logger
@@ -14,9 +17,9 @@ actor WatchCoordinator {
         self.logger = logger
     }
 
-    // MARK: - LSP server registration
+    // MARK: - LSP server events
 
-    func registerServerEvent(_ event: ServerEvent, serverID: ServerID) async {
+    func handleServerEvent(_ event: ServerEvent, serverID: ServerID) async {
         switch event {
         case .registerWatchedFiles(let id, let globs):
             await registry.register(id, serverID: serverID, globs: globs)

@@ -59,19 +59,17 @@ public actor DaemonCore: CoreProtocol {
 
         linterConfig = LinterConfig.load(from: root) ?? .defaults
 
-        let coordinator = watchCoordinator
-        try await fileSystemWatcher.start(root: root) { event in
-            await coordinator.handlePathEvent(event, router: router)
+        try await fileSystemWatcher.start(root: root) { [weak self] event in
+            await self?.watchCoordinator.handlePathEvent(event, router: router)
         }
     }
 
     private func subscribeToEvents(from client: any LSPClient) async {
         let serverID = await client.serverID
         let events = await client.serverEvents
-        let coordinator = watchCoordinator
-        Task {
+        Task { [weak self] in
             for await event in events {
-                await coordinator.registerServerEvent(event, serverID: serverID)
+                await self?.watchCoordinator.handleServerEvent(event, serverID: serverID)
             }
         }
     }
