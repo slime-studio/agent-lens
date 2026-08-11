@@ -116,7 +116,7 @@ Both language servers and linters are configured in a single `.alens.json` at th
 
 ### Customising language servers
 
-By default the daemon auto-detects which servers to run by scanning project markers (`Package.swift`, `tsconfig.json`, etc.). Adding an `lspServers` key to `.alens.json` overrides detection entirely — only the listed servers are launched.
+By default the daemon uses the built-in server for each language (the table above) and starts it lazily the first time a file of that language is diagnosed. Adding an `lspServers` key to `.alens.json` overrides the defaults — only the listed servers are launched.
 
 ```json
 {

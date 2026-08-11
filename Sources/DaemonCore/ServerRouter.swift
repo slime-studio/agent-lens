@@ -1,7 +1,7 @@
 import Foundation
 import IPC
 import LSPClient
-import LSPServerDetection
+import LSPConfig
 import Dependencies
 import Logging
 

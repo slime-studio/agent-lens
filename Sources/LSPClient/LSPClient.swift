@@ -87,7 +87,7 @@ public struct DocumentInput: Sendable {
     }
 }
 
-// MARK: - Server config (used by StdioLSPClient factory and LSPServerDetection)
+// MARK: - Server config (used by StdioLSPClient factory, ServerRouter, and LSPConfig)
 
 public struct ServerConfig: Sendable {
     public let serverID: ServerID

@@ -7,7 +7,7 @@ let package = Package(
     products: [
         .library(name: "IPC",                targets: ["IPC"]),
         .library(name: "LSPClient",          targets: ["LSPClient"]),
-        .library(name: "LSPServerDetection", targets: ["LSPServerDetection"]),
+        .library(name: "LSPConfig",          targets: ["LSPConfig"]),
         .library(name: "FileSystemWatcher",  targets: ["FileSystemWatcher"]),
         .library(name: "Linter",             targets: ["Linter"]),
         .library(name: "DaemonCore",         targets: ["DaemonCore"]),
@@ -45,7 +45,7 @@ let package = Package(
             ]
         ),
         .target(
-            name: "LSPServerDetection",
+            name: "LSPConfig",
             dependencies: ["LSPClient"]
         ),
         .target(
@@ -65,7 +65,7 @@ let package = Package(
             dependencies: [
                 "IPC",
                 "LSPClient",
-                "LSPServerDetection",
+                "LSPConfig",
                 "FileSystemWatcher",
                 "Linter",
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -101,7 +101,7 @@ let package = Package(
             dependencies: [
                 "IPC",
                 "LSPClient",
-                "LSPServerDetection",
+                "LSPConfig",
                 "FileSystemWatcher",
                 "DaemonCore",
             ]
@@ -124,7 +124,7 @@ let package = Package(
                 "DaemonCore",
                 "IPC",
                 "LSPClient",
-                "LSPServerDetection",
+                "LSPConfig",
                 "FileSystemWatcher",
                 "Linter",
                 .product(name: "Dependencies", package: "swift-dependencies"),
@@ -143,7 +143,7 @@ let package = Package(
         .testTarget(
             name: "LSPDetectionTests",
             dependencies: [
-                "LSPServerDetection",
+                "LSPConfig",
                 "DaemonCore",
                 "LSPClient",
                 "IPC",

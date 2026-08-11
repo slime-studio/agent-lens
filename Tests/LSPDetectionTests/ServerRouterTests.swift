@@ -2,7 +2,7 @@ import XCTest
 import Foundation
 import IPC
 import LSPClient
-import LSPServerDetection
+import LSPConfig
 import DaemonCore
 import Dependencies
 import Logging
