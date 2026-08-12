@@ -1,7 +1,7 @@
 import XCTest
 import IPC
 import LSPClient
-import LSPServerDetection
+import LSPConfig
 import FileSystemWatcher
 import DaemonCore
 

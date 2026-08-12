@@ -5,7 +5,7 @@ import IPC
 import Linter
 import Logging
 import LSPClient
-import LSPServerDetection
+import LSPConfig
 
 public actor DaemonCore: CoreProtocol {
     private let root: URL
