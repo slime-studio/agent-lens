@@ -18,6 +18,7 @@ final class SocketRoundtripTests: XCTestCase {
 
         // Per-run directory so socket paths never collide across parallel test runs.
         uniqueDir = "/tmp/alens-roundtrip-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(atPath: uniqueDir, withIntermediateDirectories: true)
         sockPath = socketPath(forDirectory: URL(fileURLWithPath: uniqueDir))
 
         daemon = Process()
@@ -62,8 +63,10 @@ final class SocketRoundtripTests: XCTestCase {
     }
 
     func testDiagnoseWithPathInsideRootReturnsDiagnoseResult() throws {
-        // File must be within the daemon root for the request to succeed.
+        // File must be within the daemon root, and must actually exist — path
+        // validation stats it before dispatching to a language server.
         let path = uniqueDir + "/a.swift"
+        try Data("let x = 1\n".utf8).write(to: URL(fileURLWithPath: path))
         let resp = try send(.diagnose(files: [path], timeoutSeconds: 5))
         guard case .ok(.diagnose) = resp.result else {
             XCTFail("expected .ok(.diagnose), got \(resp.result)"); return
@@ -81,6 +84,7 @@ final class SocketRoundtripTests: XCTestCase {
 
     func testLintWithPathInsideRootReturnsLintResult() throws {
         let path = uniqueDir + "/a.ts"
+        try Data("const x = 1;\n".utf8).write(to: URL(fileURLWithPath: path))
         let resp = try send(.lint(files: [path]))
         guard case .ok(.lint) = resp.result else {
             XCTFail("expected .ok(.lint), got \(resp.result)"); return
