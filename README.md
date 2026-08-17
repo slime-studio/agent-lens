@@ -1,34 +1,10 @@
 # agent-lens
 
-A macOS daemon + CLI for code diagnostics and linting. The entire interface is: **give it a list of files, get structured results back.** What produces that list and what consumes the results is entirely up to you.
+macOS CLI and daemon for code diagnostics and linting. Pass it files, get LSP diagnostics and linter output back. Use it from a shell, a git hook, CI, or an agent loop.
 
-If you need a full editor experience for agents, see **[aifed](https://github.com/ImitationGameLabs/aifed)**.
+If you need a full editor experience for agents, see [aifed](https://github.com/ImitationGameLabs/aifed).
 
 **Requirements:** macOS 15, Swift 6.
-
----
-
-## How it works
-
-`alensd` runs as a background daemon rooted at a directory. It holds live LSP sessions so language servers stay warm between queries. `alens` is a thin client that sends a command over a Unix socket and prints JSON.
-
-```
-your script / agent / CI / editor hook
-        │
-        │  list of file paths
-        ▼
-      alens  ──── Unix socket ────▶  alensd
-                                        ├── LSP session (sourcekit-lsp, ts-server, …)
-                                        └── linter process (swiftlint, eslint, ruff, …)
-        │
-        │  JSON results, per file
-        ▼
-   post-processing
-```
-
-The daemon is the only stateful part. The CLI is stateless — run it from a shell, a Makefile, an AI agent loop, a git hook, or anything else that can exec a process.
-
----
 
 ## Install
 
@@ -38,85 +14,63 @@ cp .build/release/alensd /usr/local/bin/
 cp .build/release/alens  /usr/local/bin/
 ```
 
----
-
 ## Usage
 
-Start the daemon once per project root:
+Start one daemon per project root:
 
 ```sh
-alensd --dir /path/to/project
+alens start
+# or: alens start --dir /path/to/project
 ```
 
-Then query it with any list of files:
+The daemon exits after 2 hours idle. Override with `--idle` (`30s`, `5m`, `2h`, `1d`). Logs go to the system log unless you pass `--log-file`.
+
+Then pass files. Directories are rejected; the CLI does not expand them.
 
 ```sh
-# Files from a glob
-alens diagnose Sources/**/*.swift
-
-# Files from git
-alens diagnose $(git diff --name-only HEAD)
-
-# Files from find
-alens lint $(find . -name "*.py" -not -path "./.venv/*")
-
-# Single file
-alens check Sources/App/main.swift
-
-# Daemon health
+alens diagnose Sources/App/main.swift
+alens lint $(git diff --name-only -- '*.swift')
+alens check path/to/file.ts
 alens status
-
-# Shut down
 alens stop
 ```
 
-All output is JSON. Wire it into `jq`, log it, feed it to an agent, diff it in CI — the tool does not care.
-
----
+Human-readable output by default. Add `--json` for the raw response. `diagnose` and `check` accept `--timeout` (default 5 seconds). Every command accepts `--dir` to talk to a daemon rooted somewhere other than the current directory.
 
 ## Commands
 
-| Command | Input | Output |
-|---|---|---|
-| `diagnose` | list of files | LSP diagnostics per file (errors, warnings, ranges) |
-| `lint` | list of files | linter stdout per file (raw JSON from the linter) |
-| `check` | list of files | both, in one round-trip |
-| `status` | — | readiness state and uptime per language server |
-| `start` | idle timeout, log level | ack |
-| `stop` | — | ack |
+| Command | What it does |
+|---|---|
+| `start` | Launch the daemon for this root |
+| `stop` | Shut the daemon down |
+| `status` | Server readiness and uptime |
+| `diagnose` | LSP diagnostics per file |
+| `lint` | Linter stdout per file |
+| `check` | Diagnose and lint in one round-trip |
 
-`check` is not a special mode — it is `diagnose` + `lint` returned together so you do not pay two socket round-trips.
+## Languages
 
----
+Files are routed by extension. Language servers start on first use. Servers and linters must be on `PATH`.
 
-## Wire protocol
+| Language | Extensions | Server | Linter |
+|---|---|---|---|
+| Swift | `.swift` | `sourcekit-lsp` | `swiftlint` |
+| TypeScript / JavaScript | `.ts` `.tsx` `.js` `.jsx` `.mjs` `.cjs` | `typescript-language-server` | `eslint` |
+| Python | `.py` `.pyi` | `pyright-langserver` | `ruff` |
+| Go | `.go` | `gopls` | `golangci-lint` |
+| Rust | `.rs` | `rust-analyzer` | none |
 
-Commands travel as versioned, length-prefixed JSON frames over a Unix socket at `/tmp/alensd-<hash>.sock`. The socket path is derived from the project root, so multiple daemons for different roots coexist without configuration.
+Unrecognized extensions come back as `unsupported` for diagnose and as empty lint output.
 
-Protocol version is `1`. A version mismatch returns `ErrorCode.versionMismatch` before any work is done. All responses carry the originating request ID so concurrent callers can match replies.
+## Configuration
 
----
+Optional `.alens.json` at the project root. Language servers and linters share this file.
 
-## Language servers
+### Language servers
 
-The daemon routes each file to the right LSP session by extension.
+Without an `lspServers` key, the daemon uses the built-in defaults above.
 
-| Language | Extension(s) | Server |
-|---|---|---|
-| Swift | `.swift` | `sourcekit-lsp` |
-| TypeScript | `.ts` `.tsx` | `typescript-language-server` |
-| JavaScript | `.js` `.jsx` `.mjs` `.cjs` | `typescript-language-server` |
-| Python | `.py` `.pyi` | `pyright-langserver` |
-| Go | `.go` | `gopls` |
-| Rust | `.rs` | `rust-analyzer` |
-
-Servers must be on `PATH`. Files with unrecognised extensions return `ReadinessState.unsupported`.
-
-Both language servers and linters are configured in a single `.alens.json` at the project root.
-
-### Customising language servers
-
-By default the daemon uses the built-in server for each language (the table above) and starts it lazily the first time a file of that language is diagnosed. Adding an `lspServers` key to `.alens.json` overrides the defaults — only the listed servers are launched.
+If `lspServers` is present, only those servers start. An empty object starts none.
 
 ```json
 {
@@ -125,29 +79,14 @@ By default the daemon uses the built-in server for each language (the table abov
       "command": "sourcekit-lsp",
       "args": [],
       "env": { "SOURCEKIT_LOGGING": "0" }
-    },
-    "typescript": {
-      "command": "typescript-language-server",
-      "args": ["--stdio"]
     }
   }
 }
 ```
 
-An empty `lspServers: {}` deliberately runs no servers.
+### Linters
 
----
-
-## Linters
-
-| Language | Tool |
-|---|---|
-| Swift | `swiftlint lint --reporter json` |
-| TypeScript / JavaScript | `eslint --format json` |
-| Python | `ruff check --output-format json` |
-| Go | `golangci-lint run --out-format json` |
-
-Override per project via the `linters` key in `.alens.json`:
+Override defaults with the `linters` key.
 
 ```json
 {
@@ -156,27 +95,15 @@ Override per project via the `linters` key in `.alens.json`:
       "command": "swiftlint",
       "args": ["lint", "--reporter", "json", "$FILE"],
       "fileField": "file"
-    },
-    "python": {
-      "command": "ruff",
-      "args": ["check", "--output-format", "json", "$FILE"],
-      "fileField": "filename"
     }
   }
 }
 ```
 
-`$FILE` expands to all paths in the batch — one process runs for the whole batch, and the output is split back into per-file results. `fileField` is a dotted key path within each result entry that names the file. `resultsKey` points to a nested results array when the linter wraps output (e.g. `"Issues"` for golangci-lint).
+`$FILE` expands to every path in the batch (one process per language). `fileField` is the dotted key used to split results back per file. `resultsKey` names a nested results array when the linter wraps output (for example `"Issues"` for golangci-lint).
 
----
+## How it works
 
-## References
+`alensd` is the stateful process. It holds warm LSP sessions, runs linters, and watches the project so servers stay current. `alens` is a stateless client: it sends a command over a Unix socket at `/tmp/alensd-<hash>.sock` (hash of the project root) and prints the result. Multiple roots can run at once.
 
-- [Language Server Protocol 3.17](https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/) — including pull diagnostics (`textDocument/diagnostic`)
-- [ChimeHQ/LanguageServerProtocol](https://github.com/ChimeHQ/LanguageServerProtocol) — Swift LSP types
-- [ChimeHQ/JSONRPC](https://github.com/ChimeHQ/JSONRPC) — JSON-RPC session
-- [apple/swift-nio](https://github.com/apple/swift-nio) — NIO frame codec (IPC layer)
-- [swiftlang/swift-subprocess](https://github.com/swiftlang/swift-subprocess) — subprocess spawning
-- [pointfreeco/swift-dependencies](https://github.com/pointfreeco/swift-dependencies) — dependency injection
-- [pointfreeco/swift-clocks](https://github.com/pointfreeco/swift-clocks) — injectable clocks for deterministic tests
-- [SwiftLint](https://github.com/realm/SwiftLint), [ESLint](https://eslint.org), [Ruff](https://docs.astral.sh/ruff/), [golangci-lint](https://golangci-lint.run)
+License: Apache 2.0.
