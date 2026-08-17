@@ -13,6 +13,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # macos-15's default Xcode (16.4) caps the Swift tools-version at 6.1, which
+      # forces swift-subprocess to resolve to 0.4.0 instead of the 0.5.0 pinned in
+      # Package.resolved (0.5.0 requires tools-version 6.2) — a version whose API
+      # doesn't match what ProcessRunner/StdioLSPClient are written against. Xcode 26
+      # is installed on the same runner image; just needs to be selected.
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.3.app
+
       - name: Install tools
         run: brew install swiftlint
 
